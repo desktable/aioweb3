@@ -87,7 +87,7 @@ class BaseTransport(abc.ABC):
     async def _send_request(self, request: RequestMessage) -> ResponseMessage:
         pass
 
-    async def subscribe(self, method: str, params: Any = None) -> Subscription:
+    async def subscribe(self, params: Any) -> Subscription:
         raise NotImplementedError
 
     async def unsubscribe(self, subscription: Subscription) -> None:
@@ -161,7 +161,7 @@ class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
         https://geth.ethereum.org/docs/rpc/pubsub
         """
         subscription_id = await self.send_request(RPCMethod.eth_subscribe, params)
-        queue = asyncio.Queue()
+        queue: asyncio.Queue = asyncio.Queue()
         self._subscriptions[subscription_id] = queue
         return Subscription(subscription_id, queue)
 
@@ -205,13 +205,16 @@ class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
             NotificationMessage: self._handle_notification_message,
         }
         while True:
+            # try:
             msg = await self.receive()
+            # except CancelledError:
+            #     break
             parsed = self._parse_message(msg)
             handlers[type(parsed)](parsed)
 
 
 class PersistentSocket:
-    def __init__(self, ipc_path) -> None:
+    def __init__(self, ipc_path: str) -> None:
         self.ipc_path = ipc_path
         self.reader_writer: Optional[Tuple[asyncio.StreamReader, asyncio.StreamWriter]] = None
 
