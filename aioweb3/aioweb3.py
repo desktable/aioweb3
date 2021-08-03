@@ -173,7 +173,7 @@ class AioWeb3:
             ],
         )
 
-    async def estimate_gas(self, params: TxParams, block: BlockParameter = "latest") -> int:
+    async def estimate_gas(self, params: TxParams, block: BlockParameter = "latest") -> Wei:
         qty = await self.send_request(
             RPCMethod.eth_estimateGas,
             [
@@ -181,14 +181,13 @@ class AioWeb3:
                 _format_block_parameter(block),
             ],
         )
-        return int(qty, 16)
+        return Wei(int(qty, 16))
 
     async def get_balance(self, address: Address, block: BlockParameter = "latest") -> Wei:
-        return Wei(
-            await self.send_request(
-                RPCMethod.eth_getBalance, [address, _format_block_parameter(block)]
-            )
+        b = await self.send_request(
+            RPCMethod.eth_getBalance, [address, _format_block_parameter(block)]
         )
+        return Wei(int(b, 16))
 
     async def get_block_by_number(
         self, block: BlockParameter = "latest", full_transactions: bool = False

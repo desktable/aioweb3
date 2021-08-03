@@ -12,7 +12,7 @@ from .types import LogData
 class EventArgSpec:
     name: str
     type: str
-    indexed: bool
+    indexed: bool = False
 
 
 class EventSpec:

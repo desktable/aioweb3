@@ -34,21 +34,17 @@ class DEXPair(ERC20):
     getReserves = MethodCall("getReserves", [], ["uint112", "uint112", "uint32"])
 
     Sync = EventSpec(
-        "Sync",
-        [
-            EventArgSpec(name="reserve0", type="uint112", indexed=False),
-            EventArgSpec(name="reserve1", type="uint112", indexed=False),
-        ],
+        "Sync", [EventArgSpec("reserve0", "uint112"), EventArgSpec("reserve1", "uint112")]
     )
     Swap = EventSpec(
         "Swap",
         [
-            EventArgSpec(name="sender", type="address", indexed=True),
-            EventArgSpec(name="amount0In", type="uint256", indexed=False),
-            EventArgSpec(name="amount1In", type="uint256", indexed=False),
-            EventArgSpec(name="amount0Out", type="uint256", indexed=False),
-            EventArgSpec(name="amount1Out", type="uint256", indexed=False),
-            EventArgSpec(name="to", type="address", indexed=True),
+            EventArgSpec("sender", "address", True),
+            EventArgSpec("amount0In", "uint256"),
+            EventArgSpec("amount1In", "uint256"),
+            EventArgSpec("amount0Out", "uint256"),
+            EventArgSpec("amount1Out", "uint256"),
+            EventArgSpec("to", "address", True),
         ],
     )
 
