@@ -12,6 +12,7 @@ def test_can_parse_common_events():
     with open(log_file, "rt") as f:
         loaded = json.loads(f.read())
     logs = [LogData(**log) for log in loaded]
+    assert len(logs) == 667
 
     parser = EventParser([c.ERC20.Transfer, c.DEXPair.Swap, c.DEXPair.Sync])
     all_parsed = list(parser.parse_logs(logs))
