@@ -205,10 +205,7 @@ class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
             NotificationMessage: self._handle_notification_message,
         }
         while True:
-            # try:
             msg = await self.receive()
-            # except CancelledError:
-            #     break
             parsed = self._parse_message(msg)
             handlers[type(parsed)](parsed)
 
