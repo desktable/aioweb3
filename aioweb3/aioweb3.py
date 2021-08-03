@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import typing
-import warnings
 from typing import Any, Dict, List, Optional, Union
 
 import eth_abi
@@ -11,10 +10,20 @@ from hexbytes import HexBytes
 from .endpoints import RPCMethod
 from .methodcall import MethodCallParams
 from .transport import BaseTransport, Subscription, get_transport
-from .types import (Address, BlockData, BlockParameter,
-                    CallStateOverrideParams, FilterId, LogData,
-                    SignedTransaction, TxData, TxHash, TxParams, TxReceipt,
-                    Wei)
+from .types import (
+    Address,
+    BlockData,
+    BlockParameter,
+    CallStateOverrideParams,
+    FilterId,
+    LogData,
+    SignedTransaction,
+    TxData,
+    TxHash,
+    TxParams,
+    TxReceipt,
+    Wei,
+)
 
 
 def _format_block_parameter(block_parameter: Optional[BlockParameter]) -> Optional[str]:

@@ -99,7 +99,7 @@ class BlockData(pydantic.BaseModel):
         pre=True,
     )
     def quantity_to_int(cls, v):
-        return int(v, 16)
+        return int(v, 16) if isinstance(v, str) else v
 
 
 class LogData(pydantic.BaseModel):
@@ -115,7 +115,7 @@ class LogData(pydantic.BaseModel):
 
     @pydantic.validator("logIndex", "transactionIndex", "blockNumber", pre=True)
     def quantity_to_int(cls, v):
-        return int(v, 16)
+        return int(v, 16) if isinstance(v, str) else v
 
     @pydantic.validator("address", pre=True)
     def str_to_address(cls, v):
@@ -149,7 +149,7 @@ class TxData(pydantic.BaseModel):
         pre=True,
     )
     def quantity_to_int(cls, v):
-        return int(v, 16)
+        return int(v, 16) if isinstance(v, str) else v
 
     @pydantic.validator("from_address", "to_address", pre=True)
     def str_to_address(cls, v):
@@ -204,7 +204,7 @@ class TxReceipt(pydantic.BaseModel):
         pre=True,
     )
     def quantity_to_int(cls, v):
-        return int(v, 16)
+        return int(v, 16) if isinstance(v, str) else v
 
     @pydantic.validator("from_address", "to_address", "contractAddress", pre=True)
     def str_to_address(cls, v):
