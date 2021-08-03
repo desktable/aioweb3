@@ -3,4 +3,4 @@ test:
 	poetry run isort aioweb3
 	poetry run flake8 aioweb3
 	poetry run pytest tests
-
+	poetry run mypy aioweb3

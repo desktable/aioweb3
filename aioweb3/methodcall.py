@@ -17,12 +17,11 @@ class MethodCall:
     tx_params: Optional[TxParams] = None
 
     def __call__(self, *args, to: Optional[Address] = None) -> "MethodCallParams":
-        params = {
-            "data": self.encode_input(*args),
-            "to": to or self.to,
-        }
-        params = {k: v for k, v, in params.items() if v is not None}
-        return MethodCallParams(TxParams(**params), self)
+        params = TxParams(data=self.encode_input(*args))
+        to = to or self.to
+        if to is not None:
+            params["to"] = to
+        return MethodCallParams(params, self)
 
     def bind(self, to: Address) -> "MethodCall":
         return MethodCall(self.method_name, self.input_types, self.output_types, to)
@@ -43,6 +42,6 @@ class MethodCallParams:
     tx_params: TxParams
     method_call: MethodCall
 
-    def update(self, kwargs) -> "MethodCallParams":
-        self.tx_params.update(**kwargs)
+    def update(self, kwargs: TxParams) -> "MethodCallParams":
+        self.tx_params.update(**kwargs)  # type: ignore
         return self

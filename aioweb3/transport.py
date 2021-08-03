@@ -102,7 +102,7 @@ class BaseTransport(abc.ABC):
             else:
                 return ResponseMessage(**j)
         except Exception as exc:
-            raise Web3APIError(f"Failed to parse message {msg}") from exc
+            raise Web3APIError("Failed to parse message {!r}".format(msg)) from exc
 
 
 class PersistentListener:
