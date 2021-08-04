@@ -12,12 +12,14 @@ from .methodcall import MethodCallParams
 from .transport import BaseTransport, Subscription, get_transport
 from .types import (
     Address,
+    AddressFilter,
     BlockData,
     BlockParameter,
     CallStateOverrideParams,
     FilterId,
     LogData,
     SignedTransaction,
+    TopicsFilter,
     TxData,
     TxHash,
     TxParams,
@@ -190,13 +192,26 @@ class AioWeb3:
         return Wei(int(b, 16))
 
     async def get_block_by_number(
-        self, block: BlockParameter = "latest", full_transactions: bool = False
-    ) -> Optional[BlockData]:
+        self, block: BlockParameter = "latest"
+    ) -> Optional[BlockData[TxHash]]:
+        full_transactions = False
         res = await self.send_request(
             RPCMethod.eth_getBlockByNumber, [_format_block_parameter(block), full_transactions]
         )
         if res is not None:
-            return BlockData(**res)
+            return BlockData[TxHash](**res)
+        else:
+            return None
+
+    async def get_full_block_by_number(
+        self, block: BlockParameter = "latest"
+    ) -> Optional[BlockData[TxData]]:
+        full_transactions = True
+        res = await self.send_request(
+            RPCMethod.eth_getBlockByNumber, [_format_block_parameter(block), full_transactions]
+        )
+        if res is not None:
+            return BlockData[TxData](**res)
         else:
             return None
 
@@ -204,8 +219,8 @@ class AioWeb3:
         self,
         from_block: Optional[BlockParameter] = None,
         to_block: Optional[BlockParameter] = None,
-        address: Optional[Address] = None,
-        topics: Any = None,
+        address: Optional[AddressFilter] = None,
+        topics: Optional[TopicsFilter] = None,
     ) -> FilterId:
         """
         https://eth.wiki/json-rpc/API#eth_newFilter
@@ -245,8 +260,8 @@ class AioWeb3:
         self,
         from_block: Optional[BlockParameter] = None,
         to_block: Optional[BlockParameter] = None,
-        address: Optional[Address] = None,
-        topics: Any = None,
+        address: Optional[AddressFilter] = None,
+        topics: Optional[TopicsFilter] = None,
         blockhash: Optional[str] = None,
     ) -> List[LogData]:
         """
@@ -274,8 +289,8 @@ class AioWeb3:
 
     async def subscribe_logs(
         self,
-        address: Optional[Union[str, List[str]]] = None,
-        topics: Optional[List[Union[str, List[str]]]] = None,
+        address: Optional[AddressFilter] = None,
+        topics: Optional[TopicsFilter] = None,
     ) -> Subscription:
         params: List[Any] = ["logs"]
         log_spec: Dict[str, Any] = {}

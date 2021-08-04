@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import typing
-from typing import List, Literal, NewType, Optional, Union
+from typing import Generic, List, Literal, NewType, Optional, TypeVar, Union, cast
 
 import eth_utils
 import pydantic
 from eth_account.datastructures import SignedTransaction
-
-# from hexbytes import HexBytes
-
+from pydantic.generics import GenericModel
 
 __all__ = [
     "Address",
@@ -21,20 +19,28 @@ __all__ = [
 ]
 
 
+class Address(str):
+    def __new__(cls, value) -> Address:
+        converted_value = value.lower()
+        return super().__new__(cls, converted_value)
+
+    def to_checksum_address(self) -> "ChecksumAddress":
+        try:
+            converted = eth_utils.to_checksum_address(self)
+        except ValueError:
+            raise ValueError(f"'{self}' is not a valid ETH address")
+        return cast("ChecksumAddress", converted)
+
+
+ChecksumAddress = NewType("ChecksumAddress", Address)
 BlockParameter = Union[Literal["earlist", "latest", "pending"], int]
 Wei = NewType("Wei", int)
 TxHash = NewType("TxHash", str)
 FilterId = NewType("FilterId", int)
 
 
-class Address(str):
-    def __new__(cls, value) -> Address:
-        try:
-            converted_value = eth_utils.to_checksum_address(value)
-        except ValueError:
-            raise ValueError(f"'{value}' is not a valid ETH address")
-        return super().__new__(cls, converted_value)
-
+AddressFilter = Union[Address, List[Address]]
+TopicsFilter = List[Union[str, List[str]]]
 
 TxParams = typing.TypedDict(
     "TxParams",
@@ -57,7 +63,7 @@ CallStateOverrideParams = typing.TypedDict(
     # Note: this is geth specific
     # https://geth.ethereum.org/docs/rpc/ns-eth
     {
-        "balance": Wei,
+        "balance": int,
         "nonce": int,
         "code": str,
         "state": typing.Any,
@@ -65,61 +71,6 @@ CallStateOverrideParams = typing.TypedDict(
     },
     total=False,
 )
-
-
-class BlockData(pydantic.BaseModel):
-    number: int
-    hash: str
-    parentHash: str
-    nonce: Optional[str]
-    sha3Uncles: str
-    logsBloom: Optional[str]
-    transactionsRoot: str
-    stateRoot: str
-    receiptsRoot: str
-    miner: Address
-    difficulty: int
-    totalDifficulty: int
-    extraData: str
-    size: int
-    gasLimit: int
-    gasUsed: int
-    timestamp: int
-    transactions: List[str]  # TODO: full transactions
-    uncles: List[str]
-
-    @pydantic.validator(
-        "number",
-        "difficulty",
-        "totalDifficulty",
-        "size",
-        "gasLimit",
-        "gasUsed",
-        "timestamp",
-        pre=True,
-    )
-    def quantity_to_int(cls, v):
-        return int(v, 16) if isinstance(v, str) else v
-
-
-class LogData(pydantic.BaseModel):
-    removed: bool
-    logIndex: int
-    transactionIndex: int
-    transactionHash: str
-    blockHash: str
-    blockNumber: int
-    address: Address
-    data: str
-    topics: List[str]
-
-    @pydantic.validator("logIndex", "transactionIndex", "blockNumber", pre=True)
-    def quantity_to_int(cls, v):
-        return int(v, 16) if isinstance(v, str) else v
-
-    @pydantic.validator("address", pre=True)
-    def str_to_address(cls, v):
-        return Address(v)
 
 
 class TxData(pydantic.BaseModel):
@@ -131,7 +82,7 @@ class TxData(pydantic.BaseModel):
     hash: str
     input: str
     nonce: int
-    to_address: Address
+    to_address: Optional[Address]  # create contract transactions have no "to" address
     transactionIndex: int
     value: int
     v: int
@@ -158,6 +109,68 @@ class TxData(pydantic.BaseModel):
 
     class Config:
         fields = {"from_address": "from", "to_address": "to"}
+
+
+T = TypeVar("T", TxHash, TxData)
+
+
+class BlockData(GenericModel, Generic[T]):
+    number: int
+    hash: str
+    parentHash: str
+    nonce: Optional[str]
+    sha3Uncles: str
+    logsBloom: Optional[str]
+    transactionsRoot: str
+    stateRoot: str
+    receiptsRoot: str
+    miner: Address
+    difficulty: int
+    totalDifficulty: int
+    extraData: str
+    size: int
+    gasLimit: int
+    gasUsed: int
+    timestamp: int
+    transactions: List[T]
+    uncles: List[str]
+
+    @pydantic.validator(
+        "number",
+        "difficulty",
+        "totalDifficulty",
+        "size",
+        "gasLimit",
+        "gasUsed",
+        "timestamp",
+        pre=True,
+    )
+    def quantity_to_int(cls, v):
+        return int(v, 16) if isinstance(v, str) else v
+
+
+# BlockData = GenericBlockData[str]
+# FullBlockData = GenericBlockData[TxData]
+
+
+class LogData(pydantic.BaseModel):
+    removed: bool
+    logIndex: int
+    transactionIndex: int
+    transactionHash: str
+    blockHash: str
+    blockNumber: int
+    address: Address
+    data: str
+    topics: List[str]
+
+    @pydantic.validator("logIndex", "transactionIndex", "blockNumber", pre=True)
+    def quantity_to_int(cls, v):
+        return int(v, 16) if isinstance(v, str) else v
+
+    @pydantic.validator("address", pre=True)
+    def str_to_address(cls, v):
+        return Address(v)
 
 
 class TxReceipt(pydantic.BaseModel):

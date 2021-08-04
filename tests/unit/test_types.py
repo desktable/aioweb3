@@ -3,9 +3,9 @@ import pytest
 from aioweb3 import types
 
 
-def test_Address_convert_to_checksum_address():
+def test_Address_convert_to_lower_case():
     checksum_address = "0x18C2ccD3e937bb5b1560A6f70DE9bDB1340D849d"
-    assert types.Address(checksum_address.lower()) == checksum_address
+    assert types.Address(checksum_address) == checksum_address.lower()
 
 
 def test_Address_type():
@@ -14,11 +14,17 @@ def test_Address_type():
     assert type(address) == types.Address
     assert isinstance(address, str)
 
+def test_Address_to_checksum_address():
+    address_str = "0x18C2ccD3e937bb5b1560A6f70DE9bDB1340D849d"
+    checksum_address = types.Address(address_str).to_checksum_address()
+    assert isinstance(checksum_address, str)
+    assert checksum_address == address_str
 
-def test_Address_raises_on_incorrect_address():
+
+def test_Address_to_checksum_address_raises_on_incorrect_address():
     address = "0x18C2ccD3e937bb5b1560A6f70DE9bDB1340D849d"
     with pytest.raises(ValueError):
-        types.Address(address[:-1])
+        types.Address(address[:-1]).to_checksum_address()
 
 
 def test_LogData_parses_address():

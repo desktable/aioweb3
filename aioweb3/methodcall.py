@@ -14,7 +14,6 @@ class MethodCall:
     input_types: List[str]
     output_types: List[str]
     to: Optional[Address] = None
-    tx_params: Optional[TxParams] = None
 
     def __call__(self, *args, to: Optional[Address] = None) -> "MethodCallParams":
         params = TxParams(data=self.encode_input(*args))
