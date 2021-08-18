@@ -103,19 +103,35 @@ class AioWeb3:
         return int(hex_count, 16)
 
     async def call_method(
-        self, to: Address, method_name: str, input_types, output_types, *args, **kwargs
+        self,
+        to: Address,
+        method_name: str,
+        input_types,
+        output_types,
+        *args,
+        block: BlockParameter = "latest",
+        **kwargs
     ):
         function_signature = method_name + "(" + ",".join(input_types) + ")"
         function_selector = "0x" + keccak(function_signature.encode()).hex()[:8]
         input_data = eth_abi.encode_abi(input_types, args).hex()
         data = function_selector + input_data
         params = TxParams(to=to, data=data)
-        output_data = await self._call(params, **kwargs)
+        output_data = await self._call(params, block=block, **kwargs)
         output = eth_abi.decode_abi(output_types, bytes(HexBytes(output_data)))
         if len(output) == 1:
             return output[0]
         else:
             return output
+
+    async def get_code(self, address: Address, block: BlockParameter = "latest") -> Optional[str]:
+        code = await self.send_request(
+            RPCMethod.eth_getCode, [address, _format_block_parameter(block)]
+        )
+        if code == "0x":
+            return None
+        else:
+            return code
 
     async def send_signed_transaction(self, signed: SignedTransaction) -> TxHash:
         res = await self.send_request(
@@ -146,8 +162,10 @@ class AioWeb3:
                 return receipt
             await asyncio.sleep(poll_interval)
 
-    async def call(self, method_call_params: MethodCallParams, **kwargs):
-        data = await self._call(method_call_params.tx_params)
+    async def call(
+        self, method_call_params: MethodCallParams, block: BlockParameter = "latest", **kwargs
+    ):
+        data = await self._call(method_call_params.tx_params, block=block, **kwargs)
         ret = method_call_params.method_call.decode_output(data)
         if len(ret) == 1:
             return ret[0]

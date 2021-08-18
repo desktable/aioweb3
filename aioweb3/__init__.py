@@ -12,6 +12,7 @@ from .types import (
     LogData,
     TopicsFilter,
     TxParams,
+    TxReceipt,
     Wei,
 )
 from .web3mixin import UseWeb3, Web3Mixin, set_default_web3

@@ -53,9 +53,13 @@ class Transaction(Web3Mixin):
         nonce_offset: int = 0,
         gas_multiplier: float = 1.0,
     ) -> "Transaction":
+        """Sign the transaction with the private key
+
+        Fill in the following fields if not yet set: chainId, gas, gasPrice, nonce
+        """
         start_ts = time.time()
         if "from" not in self.params:
-            self.params["from"] = wallet_address
+            self.params["from"] = wallet_address.to_checksum_address()
         await asyncio.gather(
             self._set_default_chain_id(),
             self._set_default_gas(),
@@ -67,14 +71,15 @@ class Transaction(Web3Mixin):
         self.logger.info(f"Signed transaction: {self.params} ({elapsed_time*1e3:.3f}ms)")
         return self
 
-    async def send(self) -> None:
+    async def send(self) -> TxHash:
         start_ts = time.time()
         assert self.signed_tx is not None
         self.tx_hash = await self.web3.send_signed_transaction(self.signed_tx)
         elapsed_time = time.time() - start_ts
         self.logger.info(f"Sent transaction: {self.tx_hash} ({elapsed_time*1e3:.3f}ms)")
+        return self.tx_hash
 
-    async def wait(self, timeout: float = 120.0) -> None:
+    async def wait(self, timeout: float = 120.0) -> Optional[TxReceipt]:
         assert self.tx_hash is not None
         start_ts = time.time()
         try:
@@ -83,11 +88,13 @@ class Transaction(Web3Mixin):
             )
         except asyncio.TimeoutError:
             self.logger.error("Timeout for transaction! %s", self.tx_hash)
+            raise
         else:
             elapsed_time = time.time() - start_ts
             self.logger.info(
                 f"Received transaction receipt: {self.receipt} ({elapsed_time*1e3:.3f}ms)"
             )
+        return self.receipt
 
     async def send_and_wait(self, timeout: float = 120.0):
         await self.send()

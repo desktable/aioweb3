@@ -18,6 +18,7 @@ class RPCMethod:
 
     eth_call = "eth_call"
     eth_estimateGas = "eth_estimateGas"
+    eth_getCode = "eth_getCode"
     eth_sendRawTransaction = "eth_sendRawTransaction"
 
     eth_subscribe = "eth_subscribe"

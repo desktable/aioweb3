@@ -47,6 +47,23 @@ class DEXPair(ERC20):
             EventArgSpec("to", "address", True),
         ],
     )
+    Mint = EventSpec(
+        "Mint",
+        [
+            EventArgSpec("sender", "address", True),
+            EventArgSpec("amount0", "uint"),
+            EventArgSpec("amount1", "uint"),
+        ],
+    )
+    Burn = EventSpec(
+        "Burn",
+        [
+            EventArgSpec("sender", "address", True),
+            EventArgSpec("amount0", "uint"),
+            EventArgSpec("amount1", "uint"),
+            EventArgSpec("to", "address", True),
+        ],
+    )
 
 
 class DEXFactory:

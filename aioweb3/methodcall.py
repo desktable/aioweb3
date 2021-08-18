@@ -19,7 +19,7 @@ class MethodCall:
         params = TxParams(data=self.encode_input(*args))
         to = to or self.to
         if to is not None:
-            params["to"] = to
+            params["to"] = to.to_checksum_address()
         return MethodCallParams(params, self)
 
     def bind(self, to: Address) -> "MethodCall":
