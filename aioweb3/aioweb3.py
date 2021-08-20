@@ -140,6 +140,12 @@ class AioWeb3:
         return TxHash(res)
 
     async def get_transaction_by_hash(self, tx_hash: TxHash) -> Optional[TxData]:
+        """Get the information about a transaction
+
+        Returns `None` when no transaction is found.
+
+        https://eth.wiki/json-rpc/API#eth_gettransactionbyhash
+        """
         res = await self.send_request(RPCMethod.eth_getTransactionByHash, [tx_hash])
         if res:
             return TxData(**res)
@@ -147,6 +153,12 @@ class AioWeb3:
             return None
 
     async def get_transaction_receipt(self, tx_hash: TxHash) -> Optional[TxReceipt]:
+        """Get the receipt of a transaction by transaction hash
+
+        Returns `None` when no receipt is found.
+
+        https://eth.wiki/json-rpc/API#eth_gettransactionreceipt
+        """
         res = await self.send_request(RPCMethod.eth_getTransactionReceipt, [tx_hash])
         if res:
             return TxReceipt(**res)

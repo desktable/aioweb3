@@ -74,20 +74,20 @@ CallStateOverrideParams = typing.TypedDict(
 
 
 class TxData(pydantic.BaseModel):
-    blockHash: str
-    blockNumber: int
+    blockHash: Optional[str]  # `None` when transaction is pending
+    blockNumber: Optional[int]  # `None` when transaction is pending
     from_address: Address
     gas: int
     gasPrice: int
-    hash: str
-    input: str
-    nonce: int
-    to_address: Optional[Address]  # create contract transactions have no "to" address
-    transactionIndex: int
+    hash: str  # 32 Bytes - hash of the transaction.
+    input: str  # the data send along with the transaction
+    nonce: int  # the number of transactions made by the sender prior to this one
+    to_address: Optional[Address]  # contract creation transactions have no "to" address
+    transactionIndex: int  # `None` when transaction is pending
     value: int
-    v: int
-    r: str
-    s: str
+    v: int  # ECDSA recovery id
+    r: str  # 32 Bytes - ECDSA signature r
+    s: str  # 32 Bytes - ECDSA signature s
 
     @pydantic.validator(
         "blockNumber",

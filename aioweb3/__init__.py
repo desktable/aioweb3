@@ -2,6 +2,13 @@ from .aioweb3 import AioWeb3
 from .commoncontracts import ERC20, DEXFactory, DEXPair, DEXRouter
 from .event import EventArgSpec, EventParser, EventSpec, ParsedEvent
 from .methodcall import MethodCall
+from .signer import (
+    FailedToGetReceiptError,
+    FailedToSendTransactionError,
+    GetReceiptTimeoutError,
+    Signer,
+    TransactionError,
+)
 from .transaction import Transaction
 from .transport import BaseTransport, HTTPTransport, IPCTransport, Subscription, WebsocketTransport
 from .types import (

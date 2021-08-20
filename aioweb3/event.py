@@ -20,8 +20,8 @@ class EventSpec:
         self.event_name = event_name
         self.fields = fields
 
-        self.signature = event_name + "(" + ",".join(f.type for f in fields) + ")"
-        self.signature_hash = "0x" + keccak(self.signature.encode()).hex()
+        self.signature: str = event_name + "(" + ",".join(f.type for f in fields) + ")"
+        self.signature_hash: str = "0x" + keccak(self.signature.encode()).hex()
 
         self._indexed_fields = [(f.name, f.type) for f in fields if f.indexed]
         self._non_indexed_field_names = [f.name for f in fields if not f.indexed]

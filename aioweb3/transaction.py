@@ -26,25 +26,25 @@ class Transaction(Web3Mixin):
 
     async def _set_default_chain_id(self) -> None:
         if "chainId" not in self.params:
-            self.params["chainId"] = await self.web3.chain_id
+            self.params.update({"chainId": await self.web3.chain_id})
 
     async def _set_default_gas(self) -> None:
         if "gas" not in self.params:
             # note that we generally need to set "from" before estimating gas
             gas = await self.web3.estimate_gas(self.params)
-            self.params["gas"] = gas * 2 + 125000
+            self.params.update({"gas": gas * 2})
 
     async def _set_default_gas_price(self, gas_multiplier: float):
         if "gasPrice" not in self.params:
             gas_price = await self.web3.gas_price
             gas_price = int(gas_price * gas_multiplier)
-            self.params["gasPrice"] = gas_price
+            self.params.update({"gasPrice": gas_price})
 
     async def _set_default_nonce(self, wallet_address: Address, nonce_offset: int):
         if "nonce" not in self.params:
             nonce = await self.web3.get_transaction_count(wallet_address)
             nonce += nonce_offset
-            self.params["nonce"] = nonce
+            self.params.update({"nonce": nonce})
 
     async def sign(
         self,
@@ -59,7 +59,7 @@ class Transaction(Web3Mixin):
         """
         start_ts = time.time()
         if "from" not in self.params:
-            self.params["from"] = wallet_address.to_checksum_address()
+            self.params.update({"from": wallet_address.to_checksum_address()})
         await asyncio.gather(
             self._set_default_chain_id(),
             self._set_default_gas(),
@@ -79,11 +79,15 @@ class Transaction(Web3Mixin):
         self.logger.info(f"Sent transaction: {self.tx_hash} ({elapsed_time*1e3:.3f}ms)")
         return self.tx_hash
 
-    async def wait(self, timeout: float = 120.0) -> Optional[TxReceipt]:
+    async def check_receipt(self) -> Optional[TxReceipt]:
+        assert self.tx_hash is not None
+        return await self.web3.wait_for_transaction_receipt(self.tx_hash)
+
+    async def wait(self, timeout: float = 120.0) -> TxReceipt:
         assert self.tx_hash is not None
         start_ts = time.time()
         try:
-            self.receipt = await asyncio.wait_for(
+            receipt = await asyncio.wait_for(
                 self.web3.wait_for_transaction_receipt(self.tx_hash), timeout=timeout
             )
         except asyncio.TimeoutError:
@@ -94,7 +98,8 @@ class Transaction(Web3Mixin):
             self.logger.info(
                 f"Received transaction receipt: {self.receipt} ({elapsed_time*1e3:.3f}ms)"
             )
-        return self.receipt
+        self.receipt = receipt
+        return receipt
 
     async def send_and_wait(self, timeout: float = 120.0):
         await self.send()
