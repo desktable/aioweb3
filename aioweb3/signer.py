@@ -55,8 +55,8 @@ class Signer(Web3Mixin):
     async def send_transaction(
         self,
         tx: Transaction,
-        gas_limit: Optional[int],
-        gas_price: Optional[int],
+        gas_limit: Optional[int] = None,
+        gas_price: Optional[int] = None,
         timeout: Optional[float] = None,
     ) -> Transaction:
         """Send a transaction and wait for it to be mined
@@ -65,13 +65,18 @@ class Signer(Web3Mixin):
         - tx: The transaction to send
         - gas_limit: The gas limit to use for the transaction (optional)
         - gas_price: The gas price to use for the transaction (optional)
-        - timeout: The timeout timestamp in seconds (optional). If not set, will wait indefinitely.
+        - timeout: The timeout timestamp in seconds for waiting (optional). If not set, will wait
+          indefinitely.
 
         Users are encouraged to specify `gas_limit` and `gas_price`. There are two benefits: 1) to
         speed up the transaction, and 2) to avoid estimating the gasPrice via Web3 (which tends to
         cause errors when the Web3 server is lagged behind the main network).
 
-        Note that `timeout` should be given in epoch timestamp in seconds.
+        Note that `timeout` should be given in epoch timestamp in seconds. It is only a timeout for
+        waiting for the transaction receipt, and has no effect on sending the transaction itself.
+
+        This class may raise various subclasses of `TransactionError` if the transaction fails
+        (meaning we fail to get a transaction receipt).
         """
         if gas_limit is not None:
             tx.params.update({"gas": gas_limit})
@@ -84,6 +89,7 @@ class Signer(Web3Mixin):
                 nonce = await self._allocate_next_nonce()
                 tx.params.update({"nonce": nonce})
                 await tx.sign(self.wallet_address, self.wallet_private_key)
+                self.logger.info("sending out transaction nonce=%d", nonce)
                 await tx.send()
             except Web3APIError as e:
                 raise FailedToSendTransactionError(tx) from e

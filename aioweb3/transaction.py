@@ -81,7 +81,9 @@ class Transaction(Web3Mixin):
 
     async def check_receipt(self) -> Optional[TxReceipt]:
         assert self.tx_hash is not None
-        return await self.web3.wait_for_transaction_receipt(self.tx_hash)
+        self.receipt = await self.web3.wait_for_transaction_receipt(self.tx_hash)
+        self.logger.info("Received transaction receipt: %s", self.receipt)
+        return self.receipt
 
     async def wait(self, timeout: float = 120.0) -> TxReceipt:
         assert self.tx_hash is not None
