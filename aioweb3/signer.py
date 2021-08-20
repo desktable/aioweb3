@@ -26,7 +26,7 @@ class FailedToGetReceiptError(TransactionError):
     reason = "failed to get transaction receipt"
 
 
-class GetReceiptTimeoutError(TransactionError):
+class WaitForTransactionTimeoutError(TransactionError):
     reason = "transaction time out while waiting for receipt"
 
 
@@ -52,28 +52,41 @@ class Signer(Web3Mixin):
 
         self._send_transaction_lock = asyncio.Lock()
 
-    async def send_transaction(
+    async def send_in_order_and_wait(self, txs: list[Transaction]) -> None:
+        """Send multiple transactions in order, then wait for all"""
+        wait_tasks = []
+        for tx in txs:
+            await self.send_transaction(tx)
+            wait_tasks.append(asyncio.create_task(self.wait_for_transaction(tx)))
+        await asyncio.gather(*wait_tasks)
+
+    async def send_and_wait(
         self,
         tx: Transaction,
         gas_limit: Optional[int] = None,
         gas_price: Optional[int] = None,
         timeout: Optional[float] = None,
-    ) -> Transaction:
+    ):
         """Send a transaction and wait for it to be mined
+
+        See `send_transaction` and `wait_for_transaction` for more details.
+        """
+        await self.send_transaction(tx, gas_limit, gas_price)
+        await self.wait_for_transaction(tx, timeout)
+
+    async def send_transaction(
+        self, tx: Transaction, gas_limit: Optional[int] = None, gas_price: Optional[int] = None
+    ) -> None:
+        """Send a transaction (no waiting)
 
         Parameters:
         - tx: The transaction to send
         - gas_limit: The gas limit to use for the transaction (optional)
         - gas_price: The gas price to use for the transaction (optional)
-        - timeout: The timeout timestamp in seconds for waiting (optional). If not set, will wait
-          indefinitely.
 
         Users are encouraged to specify `gas_limit` and `gas_price`. There are two benefits: 1) to
         speed up the transaction, and 2) to avoid estimating the gasPrice via Web3 (which tends to
         cause errors when the Web3 server is lagged behind the main network).
-
-        Note that `timeout` should be given in epoch timestamp in seconds. It is only a timeout for
-        waiting for the transaction receipt, and has no effect on sending the transaction itself.
 
         This class may raise various subclasses of `TransactionError` if the transaction fails
         (meaning we fail to get a transaction receipt).
@@ -95,7 +108,23 @@ class Signer(Web3Mixin):
                 raise FailedToSendTransactionError(tx) from e
             self._pending_transactions[nonce] = tx
 
-        # Wait for transaction to be mined
+    async def wait_for_transaction(self, tx: Transaction, timeout: Optional[float] = None) -> None:
+        """Wait for transaction to be mined
+
+        Parameters:
+        - tx: The transaction to send
+        - timeout: The timeout timestamp in seconds for waiting (optional). If not set, will wait
+          indefinitely.
+
+        Note that `timeout` should be given in epoch timestamp in seconds. It is only a timeout for
+        waiting for the transaction receipt, and has no effect on sending the transaction itself.
+
+        This class may raise various subclasses of `TransactionError` if the transaction fails
+        (meaning we fail to get a transaction receipt).
+        """
+        assert tx.tx_hash is not None
+        assert "nonce" in tx.params
+        nonce = tx.params["nonce"]
         try:
             while tx.receipt is None:
                 await asyncio.sleep(3)
@@ -111,13 +140,12 @@ class Signer(Web3Mixin):
                 if tx.receipt is None and nonce_has_passed:
                     raise FailedToGetReceiptError(tx)
                 if timeout is not None and time.time() > timeout:
-                    raise GetReceiptTimeoutError(tx)
+                    raise WaitForTransactionTimeoutError(tx)
             if tx.receipt is not None:
                 # We know at least (nonce + 1) transactions have been mined for this account.
                 self._update_mined_transaction_count(nonce + 1)
         finally:
             self._pending_transactions.pop(nonce)
-        return tx
 
     async def _allocate_next_nonce(self) -> int:
         """Allocate nonce for the next transaction

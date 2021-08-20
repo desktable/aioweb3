@@ -5,9 +5,9 @@ from .methodcall import MethodCall
 from .signer import (
     FailedToGetReceiptError,
     FailedToSendTransactionError,
-    GetReceiptTimeoutError,
     Signer,
     TransactionError,
+    WaitForTransactionTimeoutError,
 )
 from .transaction import Transaction
 from .transport import BaseTransport, HTTPTransport, IPCTransport, Subscription, WebsocketTransport
