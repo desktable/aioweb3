@@ -16,6 +16,7 @@ from .types import (
     AddressFilter,
     BlockData,
     BlockParameter,
+    EventTopic,
     LogData,
     TopicsFilter,
     TxParams,

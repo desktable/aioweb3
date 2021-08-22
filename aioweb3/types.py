@@ -31,16 +31,25 @@ class Address(str):
             raise ValueError(f"'{self}' is not a valid ETH address")
         return cast("ChecksumAddress", converted)
 
+    def to_event_topic(self) -> EventTopic:
+        """Convert the address into a 32 Bytes "event topic" in hex string format
+
+        Note: An address has 20 Bytes (40 chars in hex form). A topic is 32 Bytes (64 chars in hex
+        form). Thus we need to pad 24 zeros.
+        """
+        return EventTopic(self[:2] + "0" * 24 + self[2:])
+
 
 ChecksumAddress = NewType("ChecksumAddress", Address)
 BlockParameter = Union[Literal["earlist", "latest", "pending"], int]
 Wei = NewType("Wei", int)
 TxHash = NewType("TxHash", str)
 FilterId = NewType("FilterId", int)
+EventTopic = NewType("EventTopic", str)
 
 
 AddressFilter = Union[Address, List[Address]]
-TopicsFilter = List[Union[str, List[str]]]
+TopicsFilter = List[Union[EventTopic, List[EventTopic], None]]
 
 TxParams = typing.TypedDict(
     "TxParams",

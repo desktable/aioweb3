@@ -5,7 +5,7 @@ import eth_abi
 from eth_hash.auto import keccak
 from hexbytes import HexBytes
 
-from .types import LogData
+from .types import EventTopic, LogData
 
 
 @dataclass
@@ -21,7 +21,7 @@ class EventSpec:
         self.fields = fields
 
         self.signature: str = event_name + "(" + ",".join(f.type for f in fields) + ")"
-        self.signature_hash: str = "0x" + keccak(self.signature.encode()).hex()
+        self.signature_hash: EventTopic = EventTopic("0x" + keccak(self.signature.encode()).hex())
 
         self._indexed_fields = [(f.name, f.type) for f in fields if f.indexed]
         self._non_indexed_field_names = [f.name for f in fields if not f.indexed]
@@ -29,6 +29,13 @@ class EventSpec:
 
     def __repr__(self):
         return f"<EventSpec: {self.signature}>"
+
+    def get_event_topic(self) -> EventTopic:
+        """Return the event's "topic" (i.e. signature hash)
+
+        The event topic is commonly used for event log filtering.
+        """
+        return self.signature_hash
 
     @property
     def num_indexed_fields(self):
@@ -61,13 +68,13 @@ class ParsedEvent:
 
 class EventParser:
     def __init__(self, event_specs: List[EventSpec]):
-        self.event_specs = {event_spec.signature_hash: event_spec for event_spec in event_specs}
+        self.event_specs = {event_spec.get_event_topic(): event_spec for event_spec in event_specs}
 
     def parse_logs(self, logs: List[LogData]) -> Iterable[ParsedEvent]:
         for log in logs:
             if not log.topics:
                 continue
-            event_spec = self.event_specs.get(log.topics[0])
+            event_spec = self.event_specs.get(EventTopic(log.topics[0]))
             if event_spec and 1 + event_spec.num_indexed_fields == len(log.topics):
                 fields = event_spec.parse_log(log)
                 yield ParsedEvent(event_spec, fields, log)

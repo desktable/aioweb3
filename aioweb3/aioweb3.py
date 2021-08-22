@@ -294,8 +294,9 @@ class AioWeb3:
         topics: Optional[TopicsFilter] = None,
         blockhash: Optional[str] = None,
     ) -> List[LogData]:
-        """
-        https://eth.wiki/json-rpc/API#eth_getLogs
+        """Get event logs
+
+        https://eth.wiki/json-rpc/API#eth_getlogs
         """
         params = {
             "fromBlock": _format_block_parameter(from_block),

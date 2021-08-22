@@ -21,7 +21,7 @@ async def test_AioWeb3_can_use_http():
 
 @pytest.mark.asyncio
 async def test_AioWeb3_can_use_ipc():
-    web3 = AioWeb3("/data/henry/binance-smart-chain/node/geth.ipc")
+    web3 = AioWeb3("/ssd/henry/binance-smart-chain/node/geth.ipc")
     client_version = await web3.client_version
     assert client_version.startswith("Geth/")
     await web3.close()
