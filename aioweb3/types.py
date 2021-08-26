@@ -34,6 +34,8 @@ class Address(str):
     def to_event_topic(self) -> EventTopic:
         """Convert the address into a 32 Bytes "event topic" in hex string format
 
+        The output is to be used for Web3 log filtering.
+
         Note: An address has 20 Bytes (40 chars in hex form). A topic is 32 Bytes (64 chars in hex
         form). Thus we need to pad 24 zeros.
         """

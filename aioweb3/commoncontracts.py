@@ -21,6 +21,14 @@ class ERC20:
             EventArgSpec("value", "uint256", False),
         ],
     )
+    Approval = EventSpec(
+        "Approval",
+        [
+            EventArgSpec("owner", "address", True),
+            EventArgSpec("spender", "address", True),
+            EventArgSpec("value", "uint256", False),
+        ],
+    )
 
 
 class DEXPair(ERC20):

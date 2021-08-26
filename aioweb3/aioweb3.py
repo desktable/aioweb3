@@ -40,9 +40,10 @@ def _format_params(params: typing.Mapping[str, Any]) -> Dict[str, Any]:
 
 
 class AioWeb3:
-    logger = logging.getLogger(__name__)
+    """Main interface for interacting with the Web3 server"""
 
     def __init__(self, transport: Union[BaseTransport, str]):
+        self.logger = logging.getLogger(__name__)
         self._transport: BaseTransport
         if isinstance(transport, str):
             self._transport = get_transport(transport)
@@ -51,15 +52,25 @@ class AioWeb3:
         self._chain_id: Optional[int] = None
 
     async def send_request(self, method: str, params: Any = None) -> Any:
-        return await self._transport.send_request(method, params)
+        """Send a request using Web3's JSON-API"""
+        ret = await self._transport.send_request(method, params)
+        return ret
 
     async def subscribe(self, params: Any) -> Subscription:
+        """Subscribe to streaming updates from Web3"""
         return await self._transport.subscribe(params)
 
     async def unsubscribe(self, subscription: Subscription) -> None:
+        """Unsubscribe a subscription"""
         await self._transport.unsubscribe(subscription)
 
     async def close(self):
+        """Close Web3 connection
+
+        Note that it is important to close the connection when you are done interacting with
+        AioWeb3. This has to be an async method, because both closing WebSocket connections and
+        closing AioHTTP sessions are async operations.
+        """
         await self._transport.close()
 
     async def is_connect(self):

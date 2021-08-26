@@ -11,10 +11,12 @@ from aiohttp.payload import BytesPayload
 from websockets.legacy.client import WebSocketClientProtocol, connect
 
 from .endpoints import RPCMethod
-from .exceptions import Web3APIError
+from .exceptions import Web3APIError, Web3TimeoutError
 
 
 class Subscription:
+    """Holds information and data for a Web3 subscription"""
+
     def __init__(self, subscription_id: str, queue: asyncio.Queue):
         self.subscription_id = subscription_id
         self.queue = queue
@@ -31,6 +33,8 @@ class Subscription:
 
 
 class RequestMessage(pydantic.BaseModel):
+    """Representing a Web3 request"""
+
     jsonrpc: Literal["2.0"]
     method: str
     params: Any
@@ -38,6 +42,8 @@ class RequestMessage(pydantic.BaseModel):
 
 
 class ResponseMessage(pydantic.BaseModel):
+    """Representing a Web3 response"""
+
     jsonrpc: Literal["2.0"]
     error: Any
     result: Any
@@ -45,13 +51,16 @@ class ResponseMessage(pydantic.BaseModel):
 
 
 class NotificationParams(pydantic.BaseModel):
+    """Representing a Web3 notification"""
+
     subscription: str  # subscription id, e.g., "0xcd0c3e8af590364c09d0fa6a1210faf5"
     result: Any
 
 
 class NotificationMessage(pydantic.BaseModel):
-    """
-    https://geth.ethereum.org/docs/rpc/pubsub
+    """Representing a Web3 notification message
+
+    Doc: https://geth.ethereum.org/docs/rpc/pubsub
     """
 
     jsonrpc: Literal["2.0"]
@@ -60,16 +69,28 @@ class NotificationMessage(pydantic.BaseModel):
 
 
 class BaseTransport(abc.ABC):
-    logger = logging.getLogger(__name__)
+    """Base class for the transportation layer
+
+    AioWeb3 uses this instance to connect to a Web3 server.
+    """
 
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
         self._rpc_counter = itertools.count(1)
 
     @abc.abstractmethod
     async def close(self) -> None:
-        pass
+        """Gracefully close the transport
 
-    async def send_request(self, method: str, params: Any = None) -> Any:
+        Subclass should implement this method.
+        """
+
+    async def send_request(self, method: str, params: Any = None, timeout: float = 60) -> Any:
+        """Send a Web3 request and return the response
+
+        This method may raise Web3APIError if we got an error response from the server. It may also
+        raise Web3TimeoutError if the request timed out.
+        """
         request_id = next(self._rpc_counter)
         rpc_dict = {
             "jsonrpc": "2.0",
@@ -78,23 +99,37 @@ class BaseTransport(abc.ABC):
             "id": request_id,
         }
         request = RequestMessage(**rpc_dict)
-        response = await self._send_request(request)
-        if response.error:
-            raise Web3APIError(f"Received error response {response} for request {request}")
+        try:
+            response = await asyncio.wait_for(self._send_request(request), timeout=timeout)
+            if response.error:
+                raise Web3APIError(f"Received error response {response} for request {request}")
+        except asyncio.TimeoutError as exc:
+            raise Web3TimeoutError(
+                f"Timeout after {timeout} seconds for request {request}"
+            ) from exc
         return response.result
 
     @abc.abstractmethod
     async def _send_request(self, request: RequestMessage) -> ResponseMessage:
-        pass
+        """Actual implementation for `send_request`"""
 
     async def subscribe(self, params: Any) -> Subscription:
+        """Make a new subscription
+
+        Note that only TwoWayTransport (WebSocket and IPC) supports subscriptions.
+        """
         raise NotImplementedError
 
     async def unsubscribe(self, subscription: Subscription) -> None:
+        """Unsubscribe from a subscription
+
+        Note that only TwoWayTransport (WebSocket and IPC) supports subscriptions.
+        """
         raise NotImplementedError
 
     def _parse_message(self, msg: bytes) -> Union[ResponseMessage, NotificationMessage]:
-        self.logger.debug("inbound: %s", msg.decode())
+        """Parse the response message from Web3 server"""
+        self.logger.debug("inbound: %s", msg.decode().rstrip("\n"))
         try:
             j = json.loads(msg)
             if "method" in j:
@@ -106,15 +141,23 @@ class BaseTransport(abc.ABC):
 
 
 class PersistentListener:
+    """Helps TwoWayTransport continuously listen to new messages from the Web3 server
+
+    Each time we send a new request to the server, we will check if the listening task is still
+    alive. If it is not, this class will restart the listening task. This class is useful so that an
+    one-off expection does not make the TwoWayTransport class disfunctional for future requests.
+    """
+
     def __init__(self, listen_func) -> None:
         self.listen_func = listen_func
         self.is_listening: Optional[asyncio.Event] = None
         self.task: Optional[asyncio.Task] = None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> None:
         if self.task is None or self.task.done():
             self.is_listening = asyncio.Event()
             self.task = asyncio.create_task(self.listen_func())
+            # make sure that we started listening before proceeding
             await self.is_listening.wait()
 
     async def __aexit__(
@@ -124,21 +167,25 @@ class PersistentListener:
             try:
                 if self.task is not None:
                     self.task.cancel()
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 pass
             self.task = None
 
-    def is_ready(self):
+    def is_ready(self) -> None:
+        """Callback for the listening function to signal that it is ready to accept responses"""
         if self.is_listening is not None:
             self.is_listening.set()
 
     def close(self):
+        """Close this listener"""
         if self.task is not None:
             self.task.cancel()
             self.task = None
 
 
 class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
+    """Shared base class for WebSocketTransport and IPCTransport"""
+
     def __init__(self):
         super().__init__()
         self.listener = PersistentListener(self.listen)
@@ -149,16 +196,20 @@ class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
         data = json.dumps(request.dict()).encode("utf-8")
         fut = asyncio.get_event_loop().create_future()
         self._requests[request.id] = fut
-        self.logger.debug("outbound: %s", data.decode())
-        async with self.listener:
-            await self.send(data)
-            result = await fut
-        del self._requests[request.id]
+        try:
+            self.logger.debug("outbound: %s", data.decode())
+            async with self.listener:
+                await self.send(data)
+                result = await fut
+        finally:
+            # whether we got an error or not, we're done with this request
+            del self._requests[request.id]
         return result
 
     async def subscribe(self, params: Any) -> Subscription:
-        """
-        https://geth.ethereum.org/docs/rpc/pubsub
+        """Make a new subscription
+
+        Documentation: https://geth.ethereum.org/docs/rpc/pubsub
         """
         subscription_id = await self.send_request(RPCMethod.eth_subscribe, params)
         queue: asyncio.Queue = asyncio.Queue()
@@ -166,6 +217,7 @@ class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
         return Subscription(subscription_id, queue)
 
     async def unsubscribe(self, subscription: Subscription) -> None:
+        """Unsubscribe from a subscription"""
         assert isinstance(subscription, Subscription)
         response = await self.send_request(RPCMethod.eth_unsubscribe, [subscription.id])
         assert response
@@ -175,14 +227,18 @@ class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def send(self, data: bytes):
-        pass
+        """Send binary data to the Web3 server"""
 
     @abc.abstractmethod
     async def receive(self) -> bytes:
-        pass
+        """Receive binary data from the Web3 server"""
 
     @abc.abstractmethod
     async def close(self):
+        """Close the transport
+
+        Subclass implementation should call `super().close()` to close the listener.
+        """
         self.listener.close()
 
     def _handle_response_message(self, response: ResponseMessage):
@@ -199,6 +255,11 @@ class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
             self.logger.warning("Unsolicitated notification message: %s", notification)
 
     async def listen(self):
+        """Listening to Web3 server for responses
+
+        The listener is shared across multiple requests. The `PersistentListener` class will make
+        sure that the listener is running for new requests.
+        """
         self.logger.info("Starting listening for messages")
         handlers = {
             ResponseMessage: self._handle_response_message,
@@ -211,6 +272,8 @@ class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
 
 
 class PersistentSocket:
+    """Helps IPCTransport to establish a persistent socket connection to the Web3 server"""
+
     def __init__(self, ipc_path: str) -> None:
         self.ipc_path = ipc_path
         self.reader_writer: Optional[Tuple[asyncio.StreamReader, asyncio.StreamWriter]] = None
@@ -228,11 +291,12 @@ class PersistentSocket:
                 if self.reader_writer is not None:
                     _, writer = self.reader_writer
                     writer.close()
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 pass
             self.reader_writer = None
 
     async def close(self):
+        """Close the socket connection"""
         if self.reader_writer is not None:
             _, writer = self.reader_writer
             writer.close()
@@ -240,6 +304,8 @@ class PersistentSocket:
 
 
 class IPCTransport(TwoWayTransport):
+    """Transport via UNIX Socket"""
+
     def __init__(self, local_ipc_path: str):
         super().__init__()
         self.socket = PersistentSocket(local_ipc_path)
@@ -261,6 +327,8 @@ class IPCTransport(TwoWayTransport):
 
 
 class PersistentWebSocket:
+    """Helps WebSocketTransport to establish a persistent socket connection to the Web3 server"""
+
     def __init__(self, endpoint_uri: str, websocket_kwargs: Any) -> None:
         self.ws: Optional[WebSocketClientProtocol] = None
         self.endpoint_uri = endpoint_uri
@@ -278,17 +346,20 @@ class PersistentWebSocket:
             try:
                 if self.ws is not None:
                     await self.ws.close()
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 pass
             self.ws = None
 
     async def close(self):
+        """Close the WebSocket connection"""
         if self.ws is not None:
             await self.ws.close()
             self.ws = None
 
 
 class WebsocketTransport(TwoWayTransport):
+    """Transport via WebSocket"""
+
     def __init__(self, websocket_uri: str, websocket_kwargs: Optional[Any] = None):
         super().__init__()
         self.websocket_uri = websocket_uri
@@ -315,6 +386,8 @@ class WebsocketTransport(TwoWayTransport):
 
 
 class PersistentHTTPSession:
+    """Helps HTTPTransport to establish a persistent HTTP session to the Web3 server"""
+
     def __init__(self):
         self.session: Optional[aiohttp.ClientSession] = None
 
@@ -330,17 +403,20 @@ class PersistentHTTPSession:
             try:
                 if self.session is not None:
                     await self.session.close()
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 pass
             self.session = None
 
     async def close(self):
+        """Close the HTTP session"""
         if self.session is not None:
             await self.session.close()
             self.session = None
 
 
 class HTTPTransport(BaseTransport):
+    """Transport via HTTP"""
+
     def __init__(self, http_uri: str):
         super().__init__()
         self._http_uri = http_uri
@@ -361,12 +437,13 @@ class HTTPTransport(BaseTransport):
         await self.session.close()
 
 
-def get_transport(uri) -> BaseTransport:
-    w3: BaseTransport
+def get_transport(uri: str) -> BaseTransport:
+    """Return the proper transport implementation based on uri"""
+    web3: BaseTransport
     if uri.startswith("ws://") or uri.startswith("wss://"):
-        w3 = WebsocketTransport(uri)
+        web3 = WebsocketTransport(uri)
     elif uri.startswith("http://") or uri.startswith("https://"):
-        w3 = HTTPTransport(uri)
+        web3 = HTTPTransport(uri)
     else:
-        w3 = IPCTransport(uri)
-    return w3
+        web3 = IPCTransport(uri)
+    return web3

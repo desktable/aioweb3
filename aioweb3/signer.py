@@ -38,9 +38,8 @@ class Signer(Web3Mixin):
     be sent simultaneously.
     """
 
-    logger = logging.getLogger(__name__)
-
     def __init__(self, wallet_address: Address, wallet_private_key: str):
+        self.logger = logging.getLogger(__name__)
         self.wallet_address = wallet_address
         self.wallet_private_key = wallet_private_key
 
