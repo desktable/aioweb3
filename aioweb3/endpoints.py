@@ -1,4 +1,9 @@
+"""Define Web3 RPC endpoints"""
+
+
 class RPCMethod:
+    """A placeholder for various Web3 RPC methods"""
+
     web3_clientVersion = "web3_clientVersion"
 
     eth_chainId = "eth_chainId"

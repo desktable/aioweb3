@@ -51,6 +51,9 @@ class AioWeb3:
             self._transport = transport
         self._chain_id: Optional[int] = None
 
+    def __repr__(self) -> str:
+        return f"<AioWeb3: {self._transport.uri}>"
+
     async def send_request(self, method: str, params: Any = None) -> Any:
         """Send a request using Web3's JSON-API"""
         ret = await self._transport.send_request(method, params)
@@ -121,7 +124,7 @@ class AioWeb3:
         output_types,
         *args,
         block: BlockParameter = "latest",
-        **kwargs
+        **kwargs,
     ):
         function_signature = method_name + "(" + ",".join(input_types) + ")"
         function_selector = "0x" + keccak(function_signature.encode()).hex()[:8]

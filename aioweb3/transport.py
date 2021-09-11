@@ -1,3 +1,13 @@
+"""Define the Transport layer between AioWeb3 client and the Web3 server
+
+This file includes 3 implementations of the Transport layer:
+- IPCTransport: for IPC connection
+- WebsocketTransport: for WebSocket connection
+- HTTPTransport: for HTTP connection
+
+They share a common interface defined by `BaseTransport`.
+"""
+
 import abc
 import asyncio
 import itertools
@@ -23,6 +33,7 @@ class Subscription:
 
     @property
     def id(self) -> str:
+        """Subscription ID"""
         return self.subscription_id
 
     def __aiter__(self):
@@ -74,7 +85,8 @@ class BaseTransport(abc.ABC):
     AioWeb3 uses this instance to connect to a Web3 server.
     """
 
-    def __init__(self):
+    def __init__(self, uri: str):
+        self.uri = uri
         self.logger = logging.getLogger(__name__)
         self._rpc_counter = itertools.count(1)
 
@@ -186,8 +198,8 @@ class PersistentListener:
 class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
     """Shared base class for WebSocketTransport and IPCTransport"""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, uri: str):
+        super().__init__(uri)
         self.listener = PersistentListener(self.listen)
         self._requests: Dict[int, asyncio.Future[ResponseMessage]] = {}
         self._subscriptions: Dict[str, asyncio.Queue[Any]] = {}
@@ -307,7 +319,7 @@ class IPCTransport(TwoWayTransport):
     """Transport via UNIX Socket"""
 
     def __init__(self, local_ipc_path: str):
-        super().__init__()
+        super().__init__(local_ipc_path)
         self.socket = PersistentSocket(local_ipc_path)
 
     async def send(self, data: bytes):
@@ -361,7 +373,7 @@ class WebsocketTransport(TwoWayTransport):
     """Transport via WebSocket"""
 
     def __init__(self, websocket_uri: str, websocket_kwargs: Optional[Any] = None):
-        super().__init__()
+        super().__init__(websocket_uri)
         self.websocket_uri = websocket_uri
         if websocket_kwargs is None:
             websocket_kwargs = {}
@@ -418,7 +430,7 @@ class HTTPTransport(BaseTransport):
     """Transport via HTTP"""
 
     def __init__(self, http_uri: str):
-        super().__init__()
+        super().__init__(http_uri)
         self._http_uri = http_uri
         self.session = PersistentHTTPSession()
 

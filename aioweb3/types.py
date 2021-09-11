@@ -125,6 +125,37 @@ class TxData(pydantic.BaseModel):
 T = TypeVar("T", TxHash, TxData)
 
 
+class NewHead(pydantic.BaseModel):
+    """Data from streaming NewHead"""
+
+    number: int
+    hash: str
+    parentHash: str
+    nonce: Optional[str]
+    sha3Uncles: str
+    logsBloom: Optional[str]
+    transactionsRoot: str
+    stateRoot: str
+    receiptsRoot: str
+    miner: Address
+    difficulty: int
+    extraData: str
+    gasLimit: int
+    gasUsed: int
+    timestamp: int
+
+    @pydantic.validator(
+        "number",
+        "difficulty",
+        "gasLimit",
+        "gasUsed",
+        "timestamp",
+        pre=True,
+    )
+    def quantity_to_int(cls, v):
+        return int(v, 16) if isinstance(v, str) else v
+
+
 class BlockData(GenericModel, Generic[T]):
     number: int
     hash: str

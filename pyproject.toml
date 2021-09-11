@@ -14,7 +14,6 @@ hexbytes = "^0.2.1"
 websockets = "^9.1"
 pydantic = "^1.8.2"
 eth-account = "^0.5.5"
-pytest-asyncio = "^0.15.1"
 
 [tool.poetry.dev-dependencies]
 black = "^21.7b0"
