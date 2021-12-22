@@ -51,12 +51,19 @@ class Signer(Web3Mixin):
 
         self._send_transaction_lock = asyncio.Lock()
 
-    async def send_in_order_and_wait(self, txs: list[Transaction]) -> None:
-        """Send multiple transactions in order, then wait for all"""
+    async def send_in_order_and_wait(self, txs: list[Transaction], timeout: float = 60) -> None:
+        """Send multiple transactions in order, then wait for all
+
+        Args:
+            txs: list of transactions to send
+            timeout: timeout in seconds
+        """
         wait_tasks = []
         for tx in txs:
             await self.send_transaction(tx)
-            wait_tasks.append(asyncio.create_task(self.wait_for_transaction(tx)))
+            wait_tasks.append(
+                asyncio.create_task(self.wait_for_transaction(tx, deadline=time.time() + timeout))
+            )
         await asyncio.gather(*wait_tasks)
 
     async def send_and_wait(
@@ -64,31 +71,38 @@ class Signer(Web3Mixin):
         tx: Transaction,
         gas_limit: Optional[int] = None,
         gas_price: Optional[int] = None,
-        timeout: Optional[float] = None,
+        deadline: Optional[float] = None,
     ):
         """Send a transaction and wait for it to be mined
 
-        See `send_transaction` and `wait_for_transaction` for more details.
+        Args:
+            tx: the transaction object to send
+            gas_limit: the gas limit to use for the transaction (optional)
+            gas_price: the gas price to use for the transaction (optional)
+            deadline: the deadline in epoch seconds (optional)
         """
         await self.send_transaction(tx, gas_limit, gas_price)
-        await self.wait_for_transaction(tx, timeout)
+        await self.wait_for_transaction(tx, deadline)
 
     async def send_transaction(
-        self, tx: Transaction, gas_limit: Optional[int] = None, gas_price: Optional[int] = None
+        self,
+        tx: Transaction,
+        gas_limit: Optional[int] = None,
+        gas_price: Optional[int] = None,
     ) -> None:
         """Send a transaction (no waiting)
-
-        Parameters:
-        - tx: The transaction to send
-        - gas_limit: The gas limit to use for the transaction (optional)
-        - gas_price: The gas price to use for the transaction (optional)
 
         Users are encouraged to specify `gas_limit` and `gas_price`. There are two benefits: 1) to
         speed up the transaction, and 2) to avoid estimating the gasPrice via Web3 (which tends to
         cause errors when the Web3 server is lagged behind the main network).
 
-        This class may raise various subclasses of `TransactionError` if the transaction fails
-        (meaning we fail to get a transaction receipt).
+        Args:
+            tx: The transaction to send
+            gas_limit: The gas limit to use for the transaction (optional)
+            gas_price: The gas price to use for the transaction (optional)
+
+        Raises:
+            FailedToSendTransactionError: if we fail to send the transaction
         """
         if gas_limit is not None:
             tx.params.update({"gas": gas_limit})
@@ -107,19 +121,22 @@ class Signer(Web3Mixin):
                 raise FailedToSendTransactionError(tx) from e
             self._pending_transactions[nonce] = tx
 
-    async def wait_for_transaction(self, tx: Transaction, timeout: Optional[float] = None) -> None:
+    async def wait_for_transaction(self, tx: Transaction, deadline: Optional[float] = None) -> None:
         """Wait for transaction to be mined
 
-        Parameters:
-        - tx: The transaction to send
-        - timeout: The timeout timestamp in seconds for waiting (optional). If not set, will wait
-          indefinitely.
+        The transaction must have been sent out before this method is called.
 
-        Note that `timeout` should be given in epoch timestamp in seconds. It is only a timeout for
-        waiting for the transaction receipt, and has no effect on sending the transaction itself.
+        Note that the optional `deadline` argument should be given in epoch timestamp in seconds. It
+        is only a deadline for waiting for the transaction receipt, and has no effect on sending the
+        transaction itself.
 
-        This class may raise various subclasses of `TransactionError` if the transaction fails
-        (meaning we fail to get a transaction receipt).
+        Args:
+            tx: the transaction object to send
+            deadline: the deadline timestamp in seconds. If not set, it will wait indefinitely
+
+        Raises:
+            WaitForTransactionTimeoutError: if we don't receive tx receipt before the deadline
+            FailedToGetReceiptError: if we fail to get tx receipt but observed nonce has passed
         """
         assert tx.tx_hash is not None
         assert "nonce" in tx.params
@@ -138,7 +155,7 @@ class Signer(Web3Mixin):
                     self.logger.exception("Failed to query check transaction receipt")
                 if tx.receipt is None and nonce_has_passed:
                     raise FailedToGetReceiptError(tx)
-                if timeout is not None and time.time() > timeout:
+                if deadline is not None and time.time() > deadline:
                     raise WaitForTransactionTimeoutError(tx)
             if tx.receipt is not None:
                 # We know at least (nonce + 1) transactions have been mined for this account.
@@ -154,7 +171,10 @@ class Signer(Web3Mixin):
         When there are pending transactions, we skip querying Web3 and use the next nonce.
         """
         if self._pending_transactions:
-            return max(self._mined_transaction_count, max(self._pending_transactions.keys()) + 1)
+            return max(
+                self._mined_transaction_count,
+                max(self._pending_transactions.keys()) + 1,
+            )
         else:
             await self._query_mined_transaction_count()
             return self._mined_transaction_count

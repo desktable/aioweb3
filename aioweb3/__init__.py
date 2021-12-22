@@ -10,7 +10,13 @@ from .signer import (
     WaitForTransactionTimeoutError,
 )
 from .transaction import Transaction
-from .transport import BaseTransport, HTTPTransport, IPCTransport, Subscription, WebsocketTransport
+from .transport import (
+    BaseTransport,
+    HTTPTransport,
+    IPCTransport,
+    Subscription,
+    WebsocketTransport,
+)
 from .types import (
     Address,
     AddressFilter,
