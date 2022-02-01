@@ -1,5 +1,4 @@
 import pytest
-
 from aioweb3 import types
 
 
@@ -13,6 +12,7 @@ def test_Address_type():
     address = types.Address(address_str)
     assert type(address) == types.Address
     assert isinstance(address, str)
+
 
 def test_Address_to_checksum_address():
     address_str = "0x18C2ccD3e937bb5b1560A6f70DE9bDB1340D849d"

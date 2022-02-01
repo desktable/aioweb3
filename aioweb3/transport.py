@@ -205,7 +205,7 @@ class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
         self._subscriptions: Dict[str, asyncio.Queue[Any]] = {}
 
     async def _send_request(self, request: RequestMessage) -> ResponseMessage:
-        data = json.dumps(request.dict()).encode("utf-8")
+        data = json.dumps(request.dict(), separators=(",", ":")).encode("utf-8")
         fut = asyncio.get_event_loop().create_future()
         self._requests[request.id] = fut
         try:
@@ -272,7 +272,7 @@ class TwoWayTransport(BaseTransport, metaclass=abc.ABCMeta):
         The listener is shared across multiple requests. The `PersistentListener` class will make
         sure that the listener is running for new requests.
         """
-        self.logger.info("Starting listening for messages")
+        self.logger.info("Starting listening for messages %s", self.uri)
         handlers = {
             ResponseMessage: self._handle_response_message,
             NotificationMessage: self._handle_notification_message,
@@ -435,7 +435,7 @@ class HTTPTransport(BaseTransport):
         self.session = PersistentHTTPSession()
 
     async def _send_request(self, request: RequestMessage) -> ResponseMessage:
-        data = json.dumps(request.dict()).encode("utf-8")
+        data = json.dumps(request.dict(), separators=(",", ":")).encode("utf-8")
         self.logger.debug("outbound: %s", data.decode())
         payload = BytesPayload(data, content_type="application/json")
         async with self.session as session:
