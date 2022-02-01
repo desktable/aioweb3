@@ -59,7 +59,12 @@ TxParams = typing.TypedDict(
         "from": Address,  # required
         "to": Address,  # optional when creating new contract
         "gas": int,  # optional, default 90000
+        # legacy gas price field
         "gasPrice": int,  # optional
+        # EIP-1559 gas price field
+        # Signer will be charged min(maxFeePerGas, baseFeePerGas + maxPriorityFeePerGas)
+        "maxPriorityFeePerGas": int,  # optional
+        "maxFeePerGas": int,  # optional
         "value": int,  # optional
         "data": str,  # required
         "nonce": int,  # optional

@@ -1,3 +1,5 @@
+"""Define the Transaction class."""
+
 import asyncio
 import logging
 import time
@@ -12,6 +14,8 @@ from .web3mixin import Web3Mixin
 
 
 class Transaction(Web3Mixin):
+    """Represents a Web3 transaction"""
+
     logger = logging.getLogger(__name__)
 
     def __init__(self, params: Union[TxParams, MethodCallParams]):
@@ -34,7 +38,9 @@ class Transaction(Web3Mixin):
             gas = await self.web3.estimate_gas(self.params)
             self.params.update({"gas": gas * 2})
 
-    async def _set_default_gas_price(self, gas_multiplier: float):
+    async def _set_default_gas_price(self, gas_multiplier: float) -> None:
+        if "maxPriorityFeePerGas" in self.params or "maxFeePerGas" in self.params:
+            return
         if "gasPrice" not in self.params:
             gas_price = await self.web3.gas_price
             gas_price = int(gas_price * gas_multiplier)
@@ -56,6 +62,15 @@ class Transaction(Web3Mixin):
         """Sign the transaction with the private key
 
         Fill in the following fields if not yet set: chainId, gas, gasPrice, nonce
+
+        Args:
+            wallet_address: the address of the signer's wallet
+            wallet_private_key: the private key of the signer's wallet
+            nonce_offset: the nonce offset to use
+            gas_multiplier: if no gas price is set, this is used to set the gas price
+
+        Returns:
+            self (with the "signed_tx" field set)
         """
         start_ts = time.time()
         if "from" not in self.params:

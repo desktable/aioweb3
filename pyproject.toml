@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aioweb3"
-version = "0.1.0"
+version = "0.3.0"
 description = "Asynchronous Web3 client for asyncio and Python"
 authors = ["Henry Chen <chendaizhuo@gmail.com>"]
 license = "MIT"
