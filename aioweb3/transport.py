@@ -439,7 +439,7 @@ class HTTPTransport(BaseTransport):
         self.logger.debug("outbound: %s", data.decode())
         payload = BytesPayload(data, content_type="application/json")
         async with self.session as session:
-            async with session.get(self._http_uri, data=payload) as resp:
+            async with session.post(self._http_uri, data=payload) as resp:
                 res = await resp.read()
         parsed = self._parse_message(res)
         assert isinstance(parsed, ResponseMessage)
